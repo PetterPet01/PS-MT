@@ -50,17 +50,17 @@ def main(gpu,  ngpus_per_node, config, args):
             rank=args.local_rank,
             world_size=args.world_size
         )
-        if args.gcloud:
-            if args.local_rank <= 0:
-                logger.info("downloading voc dataset ...")
-                download_voc_unzip(data_dir="./VOCtrainval_11-May-2012", prefix="your/prefix/")
-                logger.info("downloading resnet {} pretrained checkpoint ...".format(str(args.backbone)))
-                download_checkpoint("VocCode/Model/PSPNet/Backbones/pretrained/",
-                                    '3x3resnet{}-imagenet.pth'.format(str(args.backbone)))
-                
-                download_checkpoint("VocCode/Model/Deeplabv3_plus/Backbones/pretrained/",
-                                    'resnet{}.pth'.format(str(args.backbone)))
-            dist.barrier()
+    if args.gcloud:
+        if args.local_rank <= 0:
+            logger.info("downloading voc dataset ...")
+            download_voc_unzip(data_dir="./VOCtrainval_11-May-2012", prefix="your/prefix/")
+            logger.info("downloading resnet {} pretrained checkpoint ...".format(str(args.backbone)))
+            download_checkpoint("VocCode/Model/PSPNet/Backbones/pretrained/",
+                                '3x3resnet{}-imagenet.pth'.format(str(args.backbone)))
+
+            download_checkpoint("VocCode/Model/Deeplabv3_plus/Backbones/pretrained/",
+                                'resnet{}.pth'.format(str(args.backbone)))
+        dist.barrier()
 
     random.seed(42)
     torch.manual_seed(42)
