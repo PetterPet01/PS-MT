@@ -26,18 +26,7 @@ class EntireModel(BaseModel):
         self.sup_loss = sup_loss
         self.ignore_index = ignore_index
         self.unsup_loss_w = cons_w_unsup
-        # self.unsuper_loss = semi_ce_loss
-        self.un_loss_type = config.get('un_loss_type', 'conf_ce')
-
-        self.mode = "semi"
-        self.sup_loss = sup_loss
-        self.ignore_index = ignore_index
-        self.unsup_loss_w = cons_w_unsup
-
-        if self.un_loss_type == 'feature_slerp':
-            self.unsuper_loss = feature_level_mseloss
-        else:  # 'conf_ce'
-            self.unsuper_loss = semi_ce_loss
+        self.unsuper_loss = semi_ce_loss
 
     def freeze_teachers_parameters(self):
         for p in self.encoder1.parameters():
@@ -63,71 +52,21 @@ class EntireModel(BaseModel):
         outputs = {'sup_pred': output_l}
         return loss, curr_losses, outputs
 
-    # def forward(self, x_l=None, target_l=None, x_ul=None, target_ul=None, curr_iter=None, epoch=None, id=0,
-    #             warm_up=False, lam=0, pad=None, semi_p_th=0.6, semi_n_th=0.6):
-    #     if warm_up:
-    #         return self.warm_up_forward(id=id, x=x_l, y=target_l)
-    #
-    #     output_l = self.decoder_s(self.encoder_s(x_l), t_model=[self.decoder1, self.decoder2])
-    #     # Supervised loss
-    #     loss_sup = F.cross_entropy(output_l, target_l, ignore_index=self.ignore_index)
-    #     curr_losses = {'loss_sup': loss_sup}
-    #     output_ul = self.decoder_s(self.encoder_s(x_ul), t_model=[self.decoder1, self.decoder2])
-    #     loss_unsup, pass_rate, neg_loss = self.unsuper_loss(inputs=output_ul, targets=target_ul,
-    #                                                         conf_mask=True, threshold=semi_p_th,
-    #                                                         threshold_neg=semi_n_th)
-    #
-    #     # for negative learning
-    #     if semi_n_th > .0:
-    #         confident_reg = .5 * torch.mean(F.softmax(output_ul, dim=1) ** 2)
-    #         loss_unsup += neg_loss
-    #         loss_unsup += confident_reg
-    #
-    #     loss_unsup = loss_unsup * self.unsup_loss_w(epoch=epoch, curr_iter=curr_iter)
-    #     total_loss = loss_unsup + loss_sup
-    #
-    #     curr_losses['loss_unsup'] = loss_unsup
-    #     curr_losses['pass_rate'] = pass_rate
-    #     curr_losses['neg_loss'] = neg_loss
-    #     outputs = {'sup_pred': output_l, 'unsup_pred': output_ul}
-    #     return total_loss, curr_losses, outputs
-
     def forward(self, x_l=None, target_l=None, x_ul=None, target_ul=None, curr_iter=None, epoch=None, id=0,
-                warm_up=False, semi_p_th=0.6, semi_n_th=0.6, **kwargs):
+                warm_up=False, lam=0, pad=None, semi_p_th=0.6, semi_n_th=0.6):
         if warm_up:
             return self.warm_up_forward(id=id, x=x_l, y=target_l)
 
-        # Supervised pass
-        student_enc_feat_l = self.encoder_s(x_l)
-        output_l = self.decoder_s(student_enc_feat_l, t_model=[self.decoder1, self.decoder2])
+        output_l = self.decoder_s(self.encoder_s(x_l), t_model=[self.decoder1, self.decoder2])
+        # Supervised loss
         loss_sup = F.cross_entropy(output_l, target_l, ignore_index=self.ignore_index)
         curr_losses = {'loss_sup': loss_sup}
+        output_ul = self.decoder_s(self.encoder_s(x_ul), t_model=[self.decoder1, self.decoder2])
+        loss_unsup, pass_rate, neg_loss = self.unsuper_loss(inputs=output_ul, targets=target_ul,
+                                                            conf_mask=True, threshold=semi_p_th,
+                                                            threshold_neg=semi_n_th)
 
-        # Unsupervised pass
-        student_enc_feat_ul = self.encoder_s(x_ul)
-
-        if self.un_loss_type == 'feature_slerp':
-            # --- NEW WAY ---
-            # target_ul is the Slerp'd feature map from the trainer
-            student_features_ul = self.decoder_s.forward_features(student_enc_feat_ul,
-                                                                  t_model=[self.decoder1, self.decoder2])
-            loss_unsup = self.unsuper_loss(student_features_ul, target_ul)
-
-            # For metrics, get the logits from the features
-            output_ul = self.decoder_s.upsample.classifier(student_features_ul)
-
-            pass_rate = {'placeholder': 0}  # Metric from old loss
-            neg_loss = torch.tensor(0.)
-
-        else:  # 'conf_ce'
-            # --- OLD WAY ---
-            # target_ul is the pseudo-label probability map
-            output_ul = self.decoder_s(student_enc_feat_ul, t_model=[self.decoder1, self.decoder2])
-            loss_unsup, pass_rate, neg_loss = self.unsuper_loss(inputs=output_ul, targets=target_ul,
-                                                                conf_mask=True, threshold=semi_p_th,
-                                                                threshold_neg=semi_n_th)
-
-        # ... (The rest of the forward pass is identical to the original) ...
+        # for negative learning
         if semi_n_th > .0:
             confident_reg = .5 * torch.mean(F.softmax(output_ul, dim=1) ** 2)
             loss_unsup += neg_loss
