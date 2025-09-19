@@ -15,6 +15,7 @@
         "resnet": 50,
         "sup_loss": "CE",
         "un_loss": "semi_ce",
+        "un_loss_type": "feature_slerp",
         "warm_up_epoch": 0
     },
 

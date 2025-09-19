@@ -88,3 +88,51 @@ def semi_ce_loss(inputs, targets,
     else:
         raise NotImplementedError
 
+def slerp(v1, v2, alpha, epsilon=1e-6):
+    """
+    Performs Spherical Linear Interpolation (Slerp) between two batches of vectors.
+    
+    Args:
+        v1 (torch.Tensor): First batch of vectors, shape [B, C, H, W].
+        v2 (torch.Tensor): Second batch of vectors, shape [B, C, H, W].
+        alpha (float): Interpolation factor, between 0 and 1.
+        epsilon (float): Small value to prevent division by zero.
+
+    Returns:
+        torch.Tensor: The interpolated vectors.
+    """
+    # L2 normalize the vectors along the channel dimension
+    v1_norm = F.normalize(v1, p=2, dim=1)
+    v2_norm = F.normalize(v2, p=2, dim=1)
+
+    # Calculate the dot product (cosine similarity)
+    dot = (v1_norm * v2_norm).sum(dim=1, keepdim=True)
+    
+    # Clamp dot product to avoid numerical instability with acos
+    dot = torch.clamp(dot, -1.0 + epsilon, 1.0 - epsilon)
+
+    # Get the angle between the vectors
+    theta = torch.acos(dot)
+    sin_theta = torch.sin(theta)
+
+    # Handle the case where vectors are nearly collinear
+    # In this case, fall back to linear interpolation
+    mask = sin_theta < epsilon
+    
+    # Slerp formula
+    term1 = (torch.sin((1.0 - alpha) * theta) / sin_theta) * v1_norm
+    term2 = (torch.sin(alpha * theta) / sin_theta) * v2_norm
+    slerp_result = term1 + term2
+
+    # Linear interpolation for collinear cases
+    lerp_result = (1.0 - alpha) * v1_norm + alpha * v2_norm
+    
+    return torch.where(mask, lerp_result, slerp_result)
+
+def feature_level_mseloss(pred_features, target_features):
+    """
+    Calculates MSE loss between two L2-normalized feature maps.
+    """
+    pred_features_norm = F.normalize(pred_features, p=2, dim=1)
+    # Target is already normalized from Slerp
+    return F.mse_loss(pred_features_norm, target_features)
