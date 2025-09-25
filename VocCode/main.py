@@ -11,12 +11,15 @@ from Utils.tensor_board import Tensorboard
 from Model.Deeplabv3_plus.EntireModel import EntireModel as model_deep
 
 from Utils.logger import *
+
 warnings.filterwarnings("ignore")
-# from dgx.download_to_pvc import *
+from dgx.download_to_pvc import *
+
+
 # from Model.PSPNet.EntireModel import EntireModel as model_psp
 
 
-def main(gpu,  ngpus_per_node, config, args):
+def main(gpu, ngpus_per_node, config, args):
     args.local_rank = gpu
     if args.local_rank <= 0:
         logger = logging.getLogger("PS-MT")
@@ -27,7 +30,8 @@ def main(gpu,  ngpus_per_node, config, args):
         logger.critical("Network Architecture: {}, with ResNet {} backbone".format(args.architecture,
                                                                                    str(args.backbone)))
         logger.critical("Current Labeled Example: {}".format(config['n_labeled_examples']))
-        logger.critical("Learning rate: other {}, and head is the SAME [world]".format(config['optimizer']['args']['lr']))
+        logger.critical(
+            "Learning rate: other {}, and head is the SAME [world]".format(config['optimizer']['args']['lr']))
 
         logger.info("Image: {}x{} based on {}x{}".format(config['train_supervised']['crop_size'],
                                                          config['train_unsupervised']['crop_size'],
@@ -39,9 +43,10 @@ def main(gpu,  ngpus_per_node, config, args):
                                                        int(config['train_supervised']
                                                            ['batch_size']) * args.world_size))
 
-        logger.info("Current unsupervised loss function: {}, with weight {} and length {}".format(config['model']['un_loss'],
-                                                                                                  config['unsupervised_w'],
-                                                                                                  config['ramp_up']))
+        logger.info(
+            "Current unsupervised loss function: {}, with weight {} and length {}".format(config['model']['un_loss'],
+                                                                                          config['unsupervised_w'],
+                                                                                          config['ramp_up']))
         logger.info("Current config+args: \n{}".format({**config, **vars(args)}))
     if args.ddp:
         dist.init_process_group(
@@ -53,13 +58,15 @@ def main(gpu,  ngpus_per_node, config, args):
     if args.gcloud:
         if args.local_rank <= 0:
             logger.info("downloading voc dataset ...")
-            download_voc_unzip(data_dir="./VOCtrainval_11-May-2012", prefix="your/prefix/")
+            # download_voc_unzip(data_dir="/home/jupyter-iec2024iot04/data/VOC2012", prefix="your/prefix/")
             logger.info("downloading resnet {} pretrained checkpoint ...".format(str(args.backbone)))
-            download_checkpoint("VocCode/Model/PSPNet/Backbones/pretrained/",
-                                '3x3resnet{}-imagenet.pth'.format(str(args.backbone)))
+            # download_checkpoint("VocCode/Model/PSPNet/Backbones/pretrained/",
+            #                     '3x3resnet{}-imagenet.pth'.format(str(args.backbone)))
 
-            download_checkpoint("VocCode/Model/Deeplabv3_plus/Backbones/pretrained/",
-                                'resnet{}.pth'.format(str(args.backbone)))
+            # download_checkpoint("VocCode/Model/Deeplabv3_plus/Backbones/pretrained/",
+            #                     'resnet{}.pth'.format(str(args.backbone)))
+    # Only synchronize if we are in a multi-process environment
+    if args.ddp:
         dist.barrier()
 
     random.seed(42)
@@ -85,7 +92,7 @@ def main(gpu,  ngpus_per_node, config, args):
         raise NotImplementedError
 
     cons_w_unsup = ConsistencyWeight(final_w=config['unsupervised_w'], iters_per_epoch=len(unsupervised_loader),
-                                     rampup_starts=0, rampup_ends=config['ramp_up'],  ramp_type="cosine_rampup")
+                                     rampup_starts=0, rampup_ends=config['ramp_up'], ramp_type="cosine_rampup")
     if args.architecture == "psp":
         assert "Code will be uploaded soon."
 
@@ -126,13 +133,13 @@ if __name__ == '__main__':
                         type=int, metavar='N')
 
     parser.add_argument('--batch_size', default=8, type=int)
-    
+
     parser.add_argument('--epochs', default=-1, type=int)
 
     parser.add_argument('--warm_up', default=0, type=int)
 
     parser.add_argument('--labeled_examples', default=1464, type=int)
-    
+
     parser.add_argument('-lr', '--learning-rate', default=1e-3, type=float,
                         help='Default HEAD Learning rate for PSP, '
                              '*Note: the head layers lr will automatically divide by 10*'
@@ -160,10 +167,10 @@ if __name__ == '__main__':
     parser.add_argument("--dgx", action="store_true",
                         help="use dgx == [4*v100] to train the machine; combo with pvc"
                              "the only difference is the batch v.s. lr")
-    
+
     parser.add_argument('--semi_p_th', type=float, default=0.6,
                         help='positive_threshold for semi-supervised loss')
-    
+
     parser.add_argument('--semi_n_th', type=float, default=0.6,
                         help='negative_threshold for semi-supervised loss')
 
@@ -199,8 +206,8 @@ if __name__ == '__main__':
         os.environ['MASTER_PORT'] = '9901'
         config['optimizer']['args']['lr'] = config['optimizer']['args']['lr'] * args.world_size
         if args.dgx is True:
-            config['train_supervised']['batch_size'] = int(32/args.gpus)
-            config['train_unsupervised']['batch_size'] = int(32/args.gpus)
+            config['train_supervised']['batch_size'] = int(32 / args.gpus)
+            config['train_unsupervised']['batch_size'] = int(32 / args.gpus)
 
     if args.ddp:
         mp.spawn(main, nprocs=config['n_gpu'], args=(config['n_gpu'], config, args))

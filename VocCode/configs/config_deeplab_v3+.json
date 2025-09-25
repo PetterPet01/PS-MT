@@ -1,6 +1,6 @@
 {
     "name": "PS-MT(VOC12)",
-    "experim_name": "your run name",
+    "experim_name": "uit-iec2024-group4",
     "n_labeled_examples": 1323,
     "ramp_up": 12,
     "unsupervised_w": 1.5,
@@ -31,7 +31,7 @@
 
 
     "train_supervised": {
-        "data_dir": "path/to/your/VOCtrainval_11-May-2012",
+        "data_dir": "~/data/VOC2012",
         "batch_size": 8,
         "crop_size": 512,
         "shuffle": true,
@@ -45,7 +45,7 @@
     },
 
     "train_unsupervised": {
-        "data_dir": "path/to/your/VOCtrainval_11-May-2012",
+        "data_dir": "~/data/VOC2012",
         "weak_labels_output": "pseudo_labels/result/pseudo_labels",
         "batch_size": 8,
         "crop_size": 512,
@@ -60,7 +60,7 @@
     },
 
     "val_loader": {
-        "data_dir": "path/to/your/VOCtrainval_11-May-2012",
+        "data_dir": "~/data/VOC2012",
         "batch_size": 1,
         "val": true,
         "split": "val",
